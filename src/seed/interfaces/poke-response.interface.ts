@@ -8,5 +8,5 @@ export interface PokeResponse {
 export interface Pokemon {
     name: string;
     url: string;
-    no?: number;
+    no: number;
 }

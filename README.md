@@ -16,9 +16,14 @@ yarn install
 npm i -g @nestjs/cli
 ```
 
-4 Run DB
+4.  Run DB
 ```
 docker-compose up -d
+```
+
+5. Load test DB
+```
+localhost:3000/api/v2/seed/
 ```
 ## Stack
 *MongoDB

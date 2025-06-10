@@ -27,6 +27,16 @@ export class PokemonService {
     }
   }
 
+  async createMany(createPokemonDto: CreatePokemonDto[]) {
+
+    try {
+      const pokemon = await this.pokemonModel.insertMany(createPokemonDto);
+      return pokemon;
+    } catch (error) {
+      this.handleException(error);
+    }
+  }
+
   findAll() {
     return this.pokemonModel.find();
   }
@@ -42,7 +52,7 @@ export class PokemonService {
     }
 
     pokemon = await this.pokemonModel.find(params);
-    if (!pokemon.length) this.handleException(id);
+    if (!pokemon.length) this.handleException(null, id);
 
     return pokemon;
   }
@@ -52,10 +62,14 @@ export class PokemonService {
     let pokemon: Pokemon;
     const property = !isNaN(+id) ? 'no' : 'name';
 
-    pokemon = await this.pokemonModel.findOneAndUpdate({ [property]: id }, { $set: updatePokemonDto }, { new: true }) as Pokemon;
-    if (!pokemon) this.handleException(id);
-    return pokemon
+    try {
 
+      pokemon = await this.pokemonModel.findOneAndUpdate({ [property]: id }, { $set: updatePokemonDto }, { new: true }) as Pokemon;
+      if (!pokemon) this.handleException(null, id);
+      return pokemon
+    } catch (error) {
+      this.handleException(error)
+    }
   }
 
   async remove(id: string) {
@@ -80,12 +94,16 @@ export class PokemonService {
 
     // Duplicate
     if (error.code === 11000) {
-      const property = Object.keys(error.errorResponse.keyValue);
-      const value = Object.values(error.errorResponse.keyValue);
-      throw new BadRequestException(`Pokemon with ${property} '${value}' already exist!`)
+      const isBulkAddError = error.name === 'MongoBulkWriteError';
+
+      throw new BadRequestException(
+        isBulkAddError
+          ? 'Looks like some of the pokemons already exist!'
+          : `Pokemon with ${Object.keys(error.errorResponse.keyValue)} '${Object.values(error.errorResponse.keyValue)}' already exist!`)
     }
 
     // Some other error
-    throw new HttpErrorByCode[error.status](error.response.message);
+    console.log(error);
+    throw new BadRequestException('Something went wrong! check logs');
   }
 }
