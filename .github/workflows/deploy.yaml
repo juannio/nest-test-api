@@ -1,0 +1,32 @@
+name: 🚀 Deploy to EC2 on Merge
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: 🔁 SSH Deploy to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v3
+
+      - name: 🔐 Set up SSH key
+        run: |
+          echo "$EC2_KEY" > key.pem
+          chmod 400 key.pem
+        env:
+          EC2_KEY: ${{ secrets.EC2_KEY }}
+
+      - name: 🚀 Deploy over SSH
+        run: |
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            cd ${{ secrets.EC2_PATH }}
+            git pull origin main
+            yarn install
+            yarn build
+            pm2 restart all || pm2 start dist/main.js --name my-api
+          EOF
