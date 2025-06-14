@@ -1,5 +1,4 @@
-name: tests CI
-
+name: PR check
 on:
   pull_request:
     branches:
@@ -7,7 +6,7 @@ on:
 
 jobs:
   build:
-
+    name: tests CI
     runs-on: ubuntu-latest
 
     steps:
