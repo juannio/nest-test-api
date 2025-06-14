@@ -29,7 +29,7 @@ describe('PokemonService', () => {
         model = module.get(getModelToken(Pokemon.name));
     });
 
-    it('should be defined', () => {
+    it('Should be defined', () => {
         expect(service).toBeDefined();
     });
 
