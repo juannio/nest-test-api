@@ -1,10 +1,9 @@
-name: tests check
+name: tests CI
 
 on:
-  push:
-    branches: [main]
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   build:
