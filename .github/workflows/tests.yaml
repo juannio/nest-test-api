@@ -1,4 +1,3 @@
-name: tests CI
 
 on:
   pull_request:
@@ -7,7 +6,7 @@ on:
 
 jobs:
   build:
-
+    name: tests CI
     runs-on: ubuntu-latest
 
     steps:
