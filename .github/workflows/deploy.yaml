@@ -28,6 +28,6 @@ jobs:
             git pull origin main
             yarn install
             yarn build
-            docker-compose up -d
-            pm2 restart all || pm2 start dist/main.js --name my-api
+            sudo docker-compose up -d
+            pm2 restart all || pm2 start src/main.js --name my-api
           EOF
