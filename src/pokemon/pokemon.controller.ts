@@ -10,6 +10,7 @@ import { PaginationDto } from 'src/common/dto/pagination.dto';
 export class PokemonController {
   constructor(private readonly pokemonService: PokemonService) { }
 
+
   @Post()
   // Custom http response code
   @HttpCode(HttpStatus.OK)
