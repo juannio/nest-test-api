@@ -1,24 +1,30 @@
-import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException, ParseIntPipe } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreatePokemonDto } from './dto/create-pokemon.dto';
 import { UpdatePokemonDto } from './dto/update-pokemon.dto';
 import { isValidObjectId, Model } from 'mongoose';
 import { Pokemon } from './entities/pokemon.entity';
 import { InjectModel } from '@nestjs/mongoose';
-import { FindByNameDto } from './dto/find-by-name.dto';
-import { HttpErrorByCode } from '@nestjs/common/utils/http-error-by-code.util';
 import { PaginationDto } from 'src/common/dto/pagination.dto';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class PokemonService {
+  private defaultLimit: any;
 
   constructor(
     @InjectModel(Pokemon.name)
     // Inject mongoDB service, we use the entity to define the data structure in DB
-    private readonly pokemonModel: Model<Pokemon>
-  ) { }
+    private readonly pokemonModel: Model<Pokemon>,
+    private readonly configService: ConfigService,
+  ) {
+    this.defaultLimit = this.configService.get<number | string>('defaultLimit');
+  }
 
   async create(createPokemonDto: CreatePokemonDto) {
-
     createPokemonDto.name = createPokemonDto.name.toLowerCase();
     try {
       const pokemon = await this.pokemonModel.create(createPokemonDto);
@@ -29,7 +35,6 @@ export class PokemonService {
   }
 
   async createMany(createPokemonDto: CreatePokemonDto[]) {
-
     try {
       const pokemon = await this.pokemonModel.insertMany(createPokemonDto);
       return pokemon;
@@ -39,23 +44,21 @@ export class PokemonService {
   }
 
   findAll(paginationDto: PaginationDto) {
+    const { limit = 0, offset = 0 } = paginationDto;
 
-    const { limit = 0, offset = 0 } = paginationDto
-
-    return this.pokemonModel.find()
-      .limit(limit)
-      .skip(offset);
+    return this.pokemonModel.find().limit(limit).skip(offset);
   }
 
   async findOne(id: string) {
-
     let pokemon;
 
-    const params = !isNaN(+id) ? {
-      no: id,
-    } : {
-      name: id.toLowerCase(),
-    }
+    const params = !isNaN(+id)
+      ? {
+          no: id,
+        }
+      : {
+          name: id.toLowerCase(),
+        };
 
     pokemon = await this.pokemonModel.find(params);
     if (!pokemon.length) this.handleException(null, id);
@@ -64,22 +67,23 @@ export class PokemonService {
   }
 
   async update(id: string, updatePokemonDto: UpdatePokemonDto) {
-
     let pokemon: Pokemon;
     const property = !isNaN(+id) ? 'no' : 'name';
 
     try {
-
-      pokemon = await this.pokemonModel.findOneAndUpdate({ [property]: id }, { $set: updatePokemonDto }, { new: true }) as Pokemon;
+      pokemon = (await this.pokemonModel.findOneAndUpdate(
+        { [property]: id },
+        { $set: updatePokemonDto },
+        { new: true },
+      )) as Pokemon;
       if (!pokemon) this.handleException(null, id);
-      return pokemon
+      return pokemon;
     } catch (error) {
-      this.handleException(error)
+      this.handleException(error);
     }
   }
 
   async remove(id: string) {
-
     let response;
 
     // If is Mongo id
@@ -87,7 +91,7 @@ export class PokemonService {
       response = await this.pokemonModel.findByIdAndDelete(id);
     } else {
       const property = !isNaN(+id) ? 'no' : 'name';
-      response = await this.pokemonModel.findOneAndDelete({ [property]: id })
+      response = await this.pokemonModel.findOneAndDelete({ [property]: id });
     }
 
     if (!response) this.handleException(id);
@@ -105,7 +109,8 @@ export class PokemonService {
       throw new BadRequestException(
         isBulkAddError
           ? 'Looks like some of the pokemons already exist!'
-          : `Pokemon with ${Object.keys(error.errorResponse.keyValue)} '${Object.values(error.errorResponse.keyValue)}' already exist!`)
+          : `Pokemon with ${Object.keys(error.errorResponse.keyValue)} '${Object.values(error.errorResponse.keyValue)}' already exist!`,
+      );
     }
 
     // Some other error

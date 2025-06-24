@@ -1,27 +1,34 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PokemonService } from '../../src/pokemon/pokemon.service';
 import { getModelToken } from '@nestjs/mongoose';
+import { ConfigService } from '@nestjs/config';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Pokemon } from '../../src/pokemon/entities/pokemon.entity';
+import { PokemonService } from '../../src/pokemon/pokemon.service';
+
+const mockPokemonModel = () => ({
+    create: jest.fn(),
+    insertMany: jest.fn(),
+    find: jest.fn(),
+    findOne: jest.fn(),
+    findOneAndUpdate: jest.fn(),
+    findByIdAndDelete: jest.fn(),
+    findOneAndDelete: jest.fn(),
+});
+
+const mockConfigService = () => ({
+    get: jest.fn().mockReturnValue(10),
+});
 
 describe('PokemonService', () => {
     let service: PokemonService;
-    let model: any;
-
-    const mockPokemonModel = {
-        find: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockResolvedValue([{ name: 'pikachu', no: 1 }]),
-        create: jest.fn().mockImplementation((dto) => Promise.resolve({ _id: 'abc123', ...dto })),
-    };
+    let model: ReturnType<typeof mockPokemonModel>;
 
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 PokemonService,
-                {
-                    provide: getModelToken(Pokemon.name),
-                    useValue: mockPokemonModel,
-                },
+                { provide: getModelToken(Pokemon.name), useFactory: mockPokemonModel },
+                { provide: ConfigService, useFactory: mockConfigService },
             ],
         }).compile();
 
@@ -29,22 +36,98 @@ describe('PokemonService', () => {
         model = module.get(getModelToken(Pokemon.name));
     });
 
-    it('IT Should be defined ok', () => {
+    it('should be defined', () => {
         expect(service).toBeDefined();
     });
 
-    it('should return all pokemons (paginated)', async () => {
-        const result = await service.findAll({ limit: 10, offset: 0 });
-        expect(model.find).toHaveBeenCalled();
-        expect(model.limit).toHaveBeenCalledWith(10);
-        expect(model.skip).toHaveBeenCalledWith(0);
-        expect(result).toEqual([{ name: 'pikachu', no: 1 }]);
+    describe('create', () => {
+        it('should create a pokemon and return it', async () => {
+            const dto = { name: 'Pikachu', no: 25 };
+            const created = { ...dto, name: 'pikachu' };
+            model.create.mockResolvedValue(created);
+
+            const result = await service.create(dto as any);
+
+            expect(model.create).toHaveBeenCalledWith({ name: 'pikachu', no: 25 });
+            expect(result).toEqual(created);
+        });
+
+        it('should throw error if duplicate', async () => {
+            const dto = { name: 'Pikachu', no: 25 };
+            model.create.mockRejectedValue({
+                code: 11000,
+                name: 'MongoServerError',
+                errorResponse: { keyValue: { name: 'pikachu' } },
+            });
+
+            await expect(service.create(dto as any)).rejects.toThrow(BadRequestException);
+        });
     });
 
-    it('should create a new pokemon', async () => {
-        const newPokemon = { name: 'Bulbasaur', no: 2 };
-        const result = await service.create({ name: 'Bulbasaur', no: 2 });
-        expect(model.create).toHaveBeenCalledWith({ name: 'bulbasaur', no: 2 });
-        expect(result).toEqual({ _id: 'abc123', name: 'bulbasaur', no: 2 });
+    describe('findOne', () => {
+        it('should return a pokemon by name', async () => {
+            const expected = [{ name: 'pikachu', no: 25 }];
+            model.find.mockResolvedValue(expected);
+
+            const result = await service.findOne('pikachu');
+
+            expect(model.find).toHaveBeenCalledWith({ name: 'pikachu' });
+            expect(result).toEqual(expected);
+        });
+
+        it('should throw NotFoundException if no result', async () => {
+            model.find.mockResolvedValue([]);
+
+            await expect(service.findOne('notfound')).rejects.toThrow(NotFoundException);
+        });
+    });
+
+    describe('update', () => {
+        it('should update and return the pokemon', async () => {
+            const updated = { name: 'bulbasaur', no: 1 };
+            model.findOneAndUpdate.mockResolvedValue(updated);
+
+            const result = await service.update('bulbasaur', { name: 'bulbasaur' });
+
+            expect(model.findOneAndUpdate).toHaveBeenCalledWith(
+                { name: 'bulbasaur' },
+                { $set: { name: 'bulbasaur' } },
+                { new: true },
+            );
+            expect(result).toEqual(updated);
+        });
+
+        it('should throw BadRequestException if not found', async () => {
+            model.findOneAndUpdate.mockResolvedValue(null);
+
+            await expect(service.update('missing', { name: 'test' })).rejects.toThrow(BadRequestException);
+        });
+    });
+
+    describe('remove', () => {
+        it('should delete by MongoID', async () => {
+            const id = '507f191e810c19729de860ea';
+            model.findByIdAndDelete.mockResolvedValue({ name: 'pikachu' });
+
+            const result = await service.remove(id);
+
+            expect(model.findByIdAndDelete).toHaveBeenCalledWith(id);
+            expect(result).toBeUndefined();
+        });
+
+        it('should delete by name', async () => {
+            model.findOneAndDelete.mockResolvedValue({ name: 'pikachu' });
+
+            const result = await service.remove('pikachu');
+
+            expect(model.findOneAndDelete).toHaveBeenCalledWith({ name: 'pikachu' });
+            expect(result).toBeUndefined();
+        });
+
+        it('should throw if not found', async () => {
+            model.findOneAndDelete.mockResolvedValue(null);
+
+            await expect(service.remove('notfound')).rejects.toThrow(BadRequestException);
+        });
     });
 });
