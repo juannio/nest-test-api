@@ -28,3 +28,6 @@ localhost:3000/api/v2/seed/
 ## Stack
 *MongoDB
 *Nest
+
+## NOTES
+ Server uses ```pm2``` to run
